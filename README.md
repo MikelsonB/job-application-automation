@@ -12,6 +12,7 @@ Open this folder with Claude Code and give it a job posting. Claude already know
 | `/status` | Dashboard: all applications, response rate, deadlines, follow-ups due |
 | `/status ukg interview Nov 3` | Updates a status and saves the details |
 | `/followups` | What needs a follow-up + email drafts |
+| `/fill` (or "fill my current tab") | Fills the application form open in your Chrome with what Claude knows, asks you the new questions (and remembers your answers for next time), stops before Next/Submit. You finish and submit. Needs the Claude in Chrome extension. |
 
 You always apply yourself, with the PDF (or DOCX) files from the application's folder.
 
@@ -22,7 +23,7 @@ You always apply yourself, with the PDF (or DOCX) files from the application's f
 - `master/resume.yaml` (English) and `master/resume.fr.yaml` (French) — your master resumes. To change your resume for **all future** applications (new job, new project), ask Claude to update the master.
 - File names: English → `Mikelson_Benjamin_Resume` + `Mikelson_Benjamin_Cover_Letter`; French → `Mikelson_Benjamin_CV` + `Mikelson_Benjamin_Lettre_de_presentation` (each as .pdf and .docx)
 - `master/experience_bank.md` — skills/experience you confirmed that don't fit on one page (Claude fills it as you answer its questions)
-- `master/profile.md` — facts for forms and letters (work permit, availability, languages, links…)
+- `master/answer_bank.md` — your answers to application form questions (address, citizenship, graduation date, availability…). Every new question you answer is saved here, so Claude never asks it twice. You can edit it anytime.
 
 ## Good to know
 
