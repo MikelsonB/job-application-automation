@@ -1,0 +1,7 @@
+node_modules/
+# Word lock files and temp files
+~$*
+*.tmp
+# inbox is a drop zone: files are moved into the application folder once processed
+inbox/*
+!inbox/.gitkeep
