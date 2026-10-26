@@ -120,6 +120,7 @@ Claude:  Both marked applied today. Follow-up reminders on Nov 6.
 
 ## Good to know
 
+- **Cover letters show your interest, not just your experience.** Each one explains why you want this company and this job, where you are now (last-year Computer Engineering student with several internships), and why you are a great fit, in 3 short paragraphs (~150-250 words) that sound like you. Your resume already lists the details. If Claude doesn't know a personal reason you want the job, it will ask you for one.
 - The resume style is locked to your originals (`master/Mikelson_Resume_Original.pdf` and `master/Mikelson_CV_2026_FR.pdf`); the content always has to fit on **one page**.
 - PDFs are made with Microsoft Word. If a build fails, close the `.docx` in Word and try again.
 - The Raleway font is installed for your Windows user (files in `assets/fonts/`). On a new computer, right-click each `.ttf` → **Install**.
