@@ -17,6 +17,98 @@ Open this folder with Claude Code and give it a job posting. Claude already know
 
 You always apply yourself, with the PDF (or DOCX) files from the application's folder.
 
+## A typical day (example)
+
+> Company names, dates and answers below are examples.
+
+### 1. Start (1 min)
+1. Open **Chrome**: be logged in to Gmail, LinkedIn and the job sites you use (Claude in Chrome extension connected).
+2. Open the **`Job_application`** folder on the Desktop → right-click inside → **Open in Terminal**.
+3. Type **`claude`** and press Enter. Claude reads `CLAUDE.md` automatically.
+
+### 2. What's new: `/status` (2 min)
+`/status` first checks Gmail (`/inbox`), then shows the dashboard.
+```
+You:     /status
+Claude:  Gmail since Oct 26: 2 job emails
+           Shopify   "Online assessment"           applied → assessment (due Nov 4)
+           NovaTech  "Interview invitation Nov 12" applied → interview
+         Update these? Add to Google Calendar?
+You:     yes, add both to calendar
+Claude:  Applications: 8 | applied: 4 | assessment: 1 | interview: 1 | rejected: 2
+         Response rate: 25%
+         Action needed:
+           • FOLLOW UP: Desjardins (applied 10 days ago, no reply)
+           • DEADLINE: Ubisoft posting closes Oct 30 (still "ready", not submitted)
+         Do you want to prepare for the NovaTech interview?
+```
+Then: `/followups` for follow-up email drafts, or "prep me for NovaTech".
+
+### 3. New jobs: `/apply` (5–10 min per job)
+```
+You:     /apply https://careers.novatech.com/jobs/4521
+```
+**Checkpoint 1 — confirm the role + language**
+```
+Claude:  NovaTech – Software Developer Intern – Winter 2027 – Montreal hybrid
+         Eligibility: ✅ graduation  ✅ work permit  ✅ language
+         Fit: 80/100 — recommended.
+         Language: English, French or both? (I recommend English)
+You:     english
+```
+**Checkpoint 2 — resume changes**
+```
+Claude:  Not on your resume: Kubernetes? pytest?
+         Proposed changes: [before → after]
+You:     kubernetes yes at Avanade, pytest no. changes ok
+Claude:  Resume ready (1 page): Mikelson_Benjamin_Resume.pdf
+```
+**Checkpoint 3 — cover letter**
+```
+Claude:  Draft: [letter]
+You:     ok
+Claude:  Cover letter ready. answers.md ready. Status: ready. Files to upload: [paths]
+```
+Repeat for each job — questions already answered are not asked again.
+
+### 4. Apply in the browser: `/fill` (2–5 min per job)
+1. In Chrome, open the application page of each "ready" job, one per tab. Log in where needed.
+2. In Claude:
+```
+You:     /fill all tabs
+Claude:  NovaTech: page 1 filled — stopped before "Next".
+         Shopify: filled — stopped before "Submit".
+         Ubisoft: waiting for you to log in.
+         1 new question: "Expected hourly rate?"
+You:     $28/h, save as default
+```
+3. **You check each tab**, upload the PDFs if needed, click **Next / Submit** yourself. Multi-page form → "continue novatech".
+
+### 5. Record it (10 sec)
+```
+You:     applied novatech and shopify
+Claude:  Both marked applied today. Follow-up reminders on Nov 6.
+```
+
+### 6. End of day (optional)
+`/status` for a last look, then close the terminal — everything is saved (folders, tracker, answer bank, git history).
+
+### Routine summary
+
+| When | You type | Time |
+|---|---|---|
+| Start of the day | `/status` (checks Gmail too) | 2 min |
+| New jobs | `/apply <link>` for each | 5–10 min each |
+| Applying | open tabs → `/fill all tabs` → you check & submit | 2–5 min each |
+| After submitting | "applied ..." | 10 sec |
+| Every few days | `/followups` | 5 min |
+| Interview coming | "prep me for <company>" | 15–30 min |
+
+### One-time setup before the first real day
+1. Install the **Claude in Chrome** extension, sign in, then type `/chrome` in Claude to connect it.
+2. Open a **new Claude session** in this folder so all settings load.
+3. Try it on **one simple job** (Greenhouse or Lever site) and watch each step.
+
 ## Where things are
 
 - `applications/<Company>/<date>_<Position>/` — everything for one application (job description, analysis, resume, cover letter, form answers, status history)
