@@ -1,7 +1,7 @@
 // Creates applications/<Company>/<YYYY-MM-DD>_<Position>/ with application.md,
-// a copy of the master resume.yaml, and company.md (once per company).
+// a copy of the master resume in the chosen language(s), and company.md (once per company).
 //
-//   node tools/new.mjs --company "UKG" --position "Software Developer Intern" [--url URL] [--date YYYY-MM-DD]
+//   node tools/new.mjs --company "UKG" --position "Software Developer Intern" --lang en|fr|both [--url URL] [--date YYYY-MM-DD]
 import fs from 'fs';
 import path from 'path';
 import { ROOT, APPS, slug, today } from './lib.mjs';
@@ -11,8 +11,9 @@ const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : unde
 const company = opt('--company');
 const position = opt('--position');
 const date = opt('--date') ?? today();
-if (!company || !position) {
-  console.error('Usage: node tools/new.mjs --company "Company" --position "Position" [--url URL] [--date YYYY-MM-DD]');
+const lang = opt('--lang');
+if (!company || !position || !['en', 'fr', 'both'].includes(lang)) {
+  console.error('Usage: node tools/new.mjs --company "Company" --position "Position" --lang en|fr|both [--url URL] [--date YYYY-MM-DD]');
   process.exit(1);
 }
 
@@ -40,7 +41,8 @@ duration: ""
 location: ""
 work_mode: ""      # On-site | Hybrid | Remote
 salary: ""
-language: ""       # English | French | Bilingual
+language: ""       # language required by the job: English | French | Bilingual
+apply_language: ${q(lang)}   # documents generated in: en | fr | both
 posted: ""
 deadline: ""
 fit_score: ""      # 0-100, from analysis.md
@@ -62,7 +64,9 @@ history:
 ## Notes
 `);
 
-fs.copyFileSync(path.join(ROOT, 'master', 'resume.yaml'), path.join(appDir, 'resume.yaml'));
+for (const file of { en: ['resume.yaml'], fr: ['resume.fr.yaml'], both: ['resume.yaml', 'resume.fr.yaml'] }[lang]) {
+  fs.copyFileSync(path.join(ROOT, 'master', file), path.join(appDir, file));
+}
 
 const companyFile = path.join(companyDir, 'company.md');
 if (!fs.existsSync(companyFile)) {

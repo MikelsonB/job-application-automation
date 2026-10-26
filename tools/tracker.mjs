@@ -6,7 +6,7 @@ import path from 'path';
 import { ROOT, CLOSED, STATUSES, today, addDays, listApplications, readApplication } from './lib.mjs';
 
 const COLUMNS = ['date_created', 'date_applied', 'company', 'position', 'type', 'term', 'location', 'work_mode', 'status',
-  'fit_score', 'priority', 'deadline', 'follow_up', 'salary', 'language', 'source', 'job_id', 'url', 'folder'];
+  'apply_language', 'fit_score', 'priority', 'deadline', 'follow_up', 'salary', 'language', 'source', 'job_id', 'url', 'folder'];
 
 const rows = listApplications().map(({ file, rel }) => {
   const data = readApplication(file).doc.toJS() ?? {};

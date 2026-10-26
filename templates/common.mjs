@@ -13,7 +13,11 @@ export function run(text, opts = {}) {
 
 // Text with **bold** markers → runs.
 export function richRuns(text, opts = {}) {
-  return String(text)
+  if (text !== null && typeof text === 'object') {
+    // Unquoted YAML text containing ": " is parsed as a key/value pair.
+    throw new Error(`A line in the YAML was read as "key: value" — wrap it in double quotes:\n  ${JSON.stringify(text)}`);
+  }
+  return String(text ?? '')
     .split(/(\*\*[^*]+\*\*)/g)
     .filter(Boolean)
     .map((part) =>

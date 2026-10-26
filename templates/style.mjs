@@ -30,7 +30,8 @@ export const SIZE = {
 export const PAGE = {
   width: 12240,
   height: 15840,
-  margin: { top: 684, bottom: 640, left: 720, right: 720 },
+  // bottom: the French original's last line sits at ~768pt, so content may go down to ~774pt
+  margin: { top: 684, bottom: 360, left: 720, right: 720 },
 };
 export const TEXT_WIDTH = PAGE.width - PAGE.margin.left - PAGE.margin.right;
 

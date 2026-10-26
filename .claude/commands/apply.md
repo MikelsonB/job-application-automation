@@ -7,4 +7,4 @@ Start the "New application workflow" from CLAUDE.md for this job posting:
 $ARGUMENTS
 
 If nothing was given above, look in `inbox/` for job description files. If the inbox is empty, ask me for the link or the text.
-Remember the 3 checkpoints: confirm the role, approve resume changes, approve the cover letter.
+Remember the 3 checkpoints: confirm the role AND ask me the language (English, French or both), approve resume changes, approve the cover letter.

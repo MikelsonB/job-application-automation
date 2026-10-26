@@ -3,7 +3,10 @@ import { Document, Paragraph, ExternalHyperlink, Tab, TabStopType, LevelFormat, 
 import { COLOR, SIZE, PAGE, TEXT_WIDTH, BULLET_INDENT, SCALE } from './style.mjs';
 import { run, richRuns, createFlow, header, sectionHeading, docDefaults } from './common.mjs';
 
-const TITLES = { experience: 'Work Experience', education: 'Education', projects: 'Projects', skills: 'Skills' };
+const TITLES = {
+  en: { experience: 'Work Experience', education: 'Education', projects: 'Projects', skills: 'Skills' },
+  fr: { experience: 'Expérience professionnelle', education: 'Formation', projects: 'Projets', skills: 'Compétences' },
+};
 
 // "Company - Title ............ dates" row (also used for schools)
 function entryRow(type, flow, strong, rest, dates) {
@@ -61,9 +64,10 @@ const sections = {
   },
 
   skills(data, flow) {
+    const colon = data.lang === 'fr' ? ' :' : ':'; // French typography: "Langages :"
     return (data.skills ?? []).map((s) => new Paragraph({
       spacing: flow.spacing('skill'),
-      children: [run(`${s.label}:`, { bold: true, size: SIZE.entry }), ...richRuns(` ${s.items}`, { size: SIZE.entry })],
+      children: [run(`${s.label}${colon}`, { bold: true, size: SIZE.entry }), ...richRuns(` ${s.items}`, { size: SIZE.entry })],
     }));
   },
 };
@@ -75,14 +79,14 @@ export function buildResume(data) {
     if (!sections[key]) throw new Error(`Unknown section "${key}" in resume.yaml`);
     if (!data[key]?.length) continue;
     // Heading first: the flow computes spacing in document order.
-    children.push(sectionHeading(data.titles?.[key] ?? TITLES[key], flow));
+    children.push(sectionHeading(data.titles?.[key] ?? TITLES[data.lang === 'fr' ? 'fr' : 'en'][key], flow));
     children.push(...sections[key](data, flow));
   }
 
   const doc = new Document({
     creator: data.name,
     lastModifiedBy: data.name,
-    title: `${data.name} - Resume`,
+    title: `${data.name} - ${data.lang === 'fr' ? 'CV' : 'Resume'}`,
     styles: docDefaults(),
     numbering: {
       config: [{
