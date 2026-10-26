@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node tools/build.mjs *)",
+      "Bash(node tools/new.mjs *)",
+      "Bash(node tools/status.mjs *)",
+      "Bash(node tools/tracker.mjs *)",
+      "Bash(node tools/snapshot.mjs *)",
+      "PowerShell(node tools/build.mjs *)",
+      "PowerShell(node tools/new.mjs *)",
+      "PowerShell(node tools/status.mjs *)",
+      "PowerShell(node tools/tracker.mjs *)",
+      "PowerShell(node tools/snapshot.mjs *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
