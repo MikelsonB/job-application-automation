@@ -7,6 +7,7 @@ Open this folder with Claude Code and give it a job posting. Claude already know
 | You type | What happens |
 |---|---|
 | `/apply <job link>` (or just paste a link/text) | Claude reads the posting → **you confirm the role and choose the language (English, French or both)** → analysis + questions about missing skills → **you approve resume changes** → resume DOCX + PDF → **you approve the cover letter** → cover letter DOCX + PDF + ready-to-paste form answers |
+| `/quick <job link>` (or `/apply quick <link>`) | **No questions:** Claude picks the language and graduation date, tailors the resume as much as possible with what's already confirmed (resume + experience bank), builds it, and gives you one report at the end (fit, changes, skills to confirm, files to upload) |
 | `/apply` with a file in `inbox/` | Same, from a PDF / Word / text file / screenshot you dropped in `inbox/` |
 | "applied" | Marks it applied today, sets a follow-up reminder 10 days later |
 | `/status` | Dashboard: all applications, response rate, deadlines, follow-ups due |
