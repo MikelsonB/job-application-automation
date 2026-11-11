@@ -14,6 +14,7 @@ Open this folder with Claude Code and give it a job posting. Claude already know
 | `/status ukg interview Nov 3` | Updates a status and saves the details |
 | `/followups` | What needs a follow-up + email drafts |
 | `/inbox` | Reads your Gmail for job emails (confirmations, tests, interviews, rejections), suggests status updates, adds interviews to Google Calendar after you confirm. Never sends or deletes emails. `/status` runs it automatically. |
+| `/updatejoblisting` | Updates **`job_listing.xlsx`**: new development internships / co-ops from Runway (with the link to the company's own site), a fit % for each, still open or closed, application deadline, and whether you applied. Ranked by priority (Canada first). `/updatejoblisting check only` = only re-checks open/closed + deadlines. Type your own notes in the `my_notes` column, they are kept. "I applied to J0123" marks a job applied; "apply to J0123" starts `/apply` with that job. |
 | `/fill` (or "fill my current tab") | Fills the application form open in your Chrome with what Claude knows, asks you the new questions (and remembers your answers for next time), stops before Next/Submit. You finish and submit. Needs the Claude in Chrome extension. |
 
 You always apply yourself, with the PDF (or DOCX) files from the application's folder.

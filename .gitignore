@@ -5,3 +5,5 @@ node_modules/
 # inbox is a drop zone: files are moved into the application folder once processed
 inbox/*
 !inbox/.gitkeep
+# job listing: temporary CSV (rebuilt by tools/joblist.mjs build)
+joblist/job_listing.csv
