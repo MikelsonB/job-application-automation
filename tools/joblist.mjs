@@ -448,7 +448,19 @@ function importExcelEdits() {
     const folder = applicationOf({ ...j, manual_status: undefined }, apps).folder;
     if (!word) { warnings.push(`${j.key}: application "${c.a}" not understood (use applied, skipped, not applied or hide)`); continue; }
     if (word === 'hide') { j.hidden = true; j.hidden_reason = 'hidden in Excel'; changes.push(`${j.key} ${j.company}: hidden`); continue; }
-    if (folder) { warnings.push(`${j.key}: has an application folder (${folder}), its status comes from there; change it with status.mjs`); continue; }
+    if (folder) {
+      // Excel is the source of truth for "applied": a folder still in drafting / ready is moved to applied
+      const folderStatus = applicationOf({ ...j, manual_status: undefined }, apps).status;
+      if (word === 'applied' && ['drafting', 'ready'].includes(folderStatus)) {
+        execFileSync('node', [path.join(ROOT, 'tools', 'status.mjs'), folder, 'applied', '--note', 'Marked applied in job_listing.xlsx'], { cwd: ROOT, stdio: 'ignore' });
+        changes.push(`${j.key} ${j.company}: applied (folder ${folder} updated from ${folderStatus})`);
+      } else if (word === 'applied') {
+        changes.push(`${j.key} ${j.company}: already "${folderStatus}" in its folder, nothing to change`);
+      } else {
+        warnings.push(`${j.key}: has an application folder (${folder}, status ${folderStatus}); "${c.a}" not applied there, tell Claude to update it with status.mjs`);
+      }
+      continue;
+    }
     j.manual_status = word === 'clear' ? undefined : word;
     j.manual_status_date = word === 'clear' ? undefined : today();
     changes.push(`${j.key} ${j.company}: ${word === 'clear' ? 'not applied' : word}`);
