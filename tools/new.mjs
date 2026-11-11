@@ -43,7 +43,7 @@ work_mode: ""      # On-site | Hybrid | Remote
 salary: ""
 language: ""       # language required by the job: English | French | Bilingual
 apply_language: ${q(lang)}   # documents generated in: en | fr | both
-expected_graduation: "May 2027"   # change only if Mikelson confirms pushing graduation for this job
+expected_graduation: "December 2027"   # change only if Mikelson confirms pushing graduation for this job
 posted: ""
 deadline: ""
 fit_score: ""      # 0-100, from analysis.md
