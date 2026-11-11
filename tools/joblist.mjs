@@ -518,6 +518,17 @@ function cmdBuild() {
     importExcelEdits();
   }
   const apps = loadApplications();
+  // closed postings / deadline passed leave the list automatically, unless Mikelson applied (then they stay, greyed)
+  const removed = [];
+  for (const j of store.jobs.filter((x) => !x.hidden)) {
+    const posting = postingLabel(j);
+    if (!['closed', 'deadline passed'].includes(posting)) continue;
+    if (!['not applied', 'skipped'].includes(applicationOf(j, apps).status)) continue;
+    j.hidden = true;
+    j.hidden_reason = posting === 'closed' ? 'posting closed (auto)' : 'deadline passed (auto)';
+    removed.push(`${j.key} | ${posting} | ${j.company} | ${j.title}`);
+  }
+  if (removed.length) { save(); console.log(`Removed (closed, not applied): ${removed.length}\n  ${removed.join('\n  ')}`); }
   const rows = store.jobs.filter((j) => !j.hidden).map((j) => {
     const app = applicationOf(j, apps);
     const posting = postingLabel(j);
