@@ -412,19 +412,59 @@ function postingLabel(j) {
   if (j.deadline && j.deadline < today()) return 'deadline passed';
   return j.posting_status || 'not checked';
 }
+// Excel is editable for 3 columns: my_notes (free text), fit (0-100) and application
+// (applied / skipped / not applied / hide). A cell counts as edited when it differs from what the last build wrote.
+const APP_WORDS = {
+  applied: ['applied', 'apply', 'yes', 'done', 'sent', 'postulé', 'postule', 'oui'],
+  skipped: ['skipped', 'skip', 'no', 'not interested', 'pass', 'non'],
+  clear: ['not applied', 'clear', ''],
+  hide: ['hide', 'hidden', 'remove', 'delete'],
+};
+function importExcelEdits() {
+  let cells;
+  try {
+    const out = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', PS1, '-Mode', 'read', '-Xlsx', XLSX], { encoding: 'utf8' });
+    cells = JSON.parse(out.trim() || '{}');
+  } catch (e) { console.warn('Could not read your edits from the Excel file: ' + e.message.split('\n')[0]); return; }
+  const apps = loadApplications();
+  const changes = [], warnings = [];
+  for (const j of store.jobs) {
+    const c = cells[j.key];
+    if (!c) continue;
+    j.my_notes = c.n || '';
+    // fit
+    const before = j.excel ? j.excel.fit : j.fit ?? null;
+    const typed = c.f === '' || c.f == null ? null : Number(c.f);
+    if (typed !== before && !(typed == null && before == null)) {
+      if (typed == null) warnings.push(`${j.key}: fit cell emptied, kept ${j.fit ?? 'empty'}`);
+      else if (!(typed >= 0 && typed <= 100)) warnings.push(`${j.key}: fit "${c.f}" ignored (must be 0-100)`);
+      else { changes.push(`${j.key} ${j.company}: fit ${j.fit ?? '-'} → ${Math.round(typed)}`); j.fit = Math.round(typed); j.fit_source = 'excel'; }
+    }
+    // application
+    const wrote = String(j.excel ? j.excel.application : applicationOf(j, apps).status).trim().toLowerCase();
+    const now = String(c.a ?? '').trim().toLowerCase();
+    if (now === wrote) continue;
+    const word = Object.keys(APP_WORDS).find((k) => APP_WORDS[k].includes(now));
+    const folder = applicationOf({ ...j, manual_status: undefined }, apps).folder;
+    if (!word) { warnings.push(`${j.key}: application "${c.a}" not understood (use applied, skipped, not applied or hide)`); continue; }
+    if (word === 'hide') { j.hidden = true; j.hidden_reason = 'hidden in Excel'; changes.push(`${j.key} ${j.company}: hidden`); continue; }
+    if (folder) { warnings.push(`${j.key}: has an application folder (${folder}), its status comes from there; change it with status.mjs`); continue; }
+    j.manual_status = word === 'clear' ? undefined : word;
+    j.manual_status_date = word === 'clear' ? undefined : today();
+    changes.push(`${j.key} ${j.company}: ${word === 'clear' ? 'not applied' : word}`);
+  }
+  save();
+  if (changes.length) console.log('Your edits in Excel, saved:\n  ' + changes.join('\n  '));
+  if (warnings.length) console.log('Excel edits NOT applied:\n  ' + warnings.join('\n  '));
+}
+
 function cmdBuild() {
   if (fs.existsSync(XLSX)) {
     try { fs.closeSync(fs.openSync(XLSX, 'r+')); } catch (e) {
       if (['EBUSY', 'EPERM', 'EACCES'].includes(e.code)) die('job_listing.xlsx is open in Excel. Close it, then run `node tools/joblist.mjs build` again.', 3);
       throw e;
     }
-    // keep what Mikelson typed in the "my_notes" column
-    try {
-      const out = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', PS1, '-Mode', 'read', '-Xlsx', XLSX], { encoding: 'utf8' });
-      const notes = JSON.parse(out.trim() || '{}');
-      for (const j of store.jobs) if (Object.prototype.hasOwnProperty.call(notes, j.key)) j.my_notes = notes[j.key] || '';
-      save();
-    } catch (e) { console.warn('Could not read my_notes from the Excel file: ' + e.message.split('\n')[0]); }
+    importExcelEdits();
   }
   const apps = loadApplications();
   const rows = store.jobs.filter((j) => !j.hidden).map((j) => {
@@ -446,6 +486,9 @@ function cmdBuild() {
   const lines = rows.map(({ j, app, posting, rank }) => [rank, j.fit ?? '', app.status, posting, j.deadline || '', j.date_posted || '', j.type, j.country, j.company, j.title, j.location,
     j.category, [j.notes, j.fit == null && j.category !== 'defense (not eligible)' ? 'fit not scored yet' : ''].filter(Boolean).join('; '), j.my_notes || '', j.key, j.last_checked || '', j.apply_url].map(q).join(','));
   fs.writeFileSync(CSV, '﻿' + [cols.join(','), ...lines].join('\r\n') + '\r\n');
+  // remember what this build wrote, so the next build can tell what Mikelson changed in Excel
+  for (const { j, app } of rows) j.excel = { fit: j.fit ?? null, application: app.status };
+  save();
   const out = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', PS1, '-Mode', 'write', '-Csv', CSV, '-Xlsx', XLSX, '-Today', today(), '-SoonDays', String(cfg.deadline_soon_days)], { encoding: 'utf8' });
   process.stdout.write(out);
   const c = (f) => rows.filter(f).length;

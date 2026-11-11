@@ -1,5 +1,5 @@
 # Used by tools/joblist.mjs (don't run by hand).
-#   -Mode read  -Xlsx <file>                        prints {"J0001":"my note",...} from the "my_notes" column
+#   -Mode read  -Xlsx <file>                        prints {"J0001":{"n":my_notes,"f":fit,"a":application},...}
 #   -Mode write -Csv <file> -Xlsx <file> -Today D   builds the formatted Excel file from the CSV
 param([string]$Mode, [string]$Csv, [string]$Xlsx, [string]$Today, [int]$SoonDays = 7)
 $ErrorActionPreference = 'Stop'
@@ -16,17 +16,22 @@ try {
   if ($Mode -eq 'read') {
     $wb = $xl.Workbooks.Open($Xlsx, 0, $true)
     $ws = $wb.Worksheets.Item(1)
-    $kc = ColOf $ws 'key'; $nc = ColOf $ws 'my_notes'
-    $notes = @{}
-    if ($kc -and $nc) {
+    $kc = ColOf $ws 'key'; $nc = ColOf $ws 'my_notes'; $fc = ColOf $ws 'fit'; $ac = ColOf $ws 'application'
+    $cells = @{}
+    if ($kc) {
       $last = $ws.UsedRange.Rows.Count
       for ($r = 2; $r -le $last; $r++) {
         $k = [string]$ws.Cells.Item($r, $kc).Value2
-        if ($k) { $notes[$k] = [string]$ws.Cells.Item($r, $nc).Value2 }
+        if (-not $k) { continue }
+        $cells[$k] = @{
+          n = $(if ($nc) { [string]$ws.Cells.Item($r, $nc).Value2 } else { '' })
+          f = $(if ($fc) { $ws.Cells.Item($r, $fc).Value2 } else { $null })
+          a = $(if ($ac) { [string]$ws.Cells.Item($r, $ac).Value2 } else { $null })
+        }
       }
     }
     $wb.Close($false)
-    if ($notes.Count -eq 0) { '{}' } else { $notes | ConvertTo-Json -Compress }
+    if ($cells.Count -eq 0) { '{}' } else { $cells | ConvertTo-Json -Compress -Depth 3 }
     return
   }
 
@@ -69,6 +74,23 @@ try {
     $lc = $ws.Cells.Item($r, $c['link'])
     $u = [string]$lc.Value2
     if ($u -like 'http*') { $ws.Hyperlinks.Add($lc, $u, '', '', $u) | Out-Null }
+  }
+  # editable columns: yellow header + dropdown on "application" (free text still allowed)
+  foreach ($h in 'fit','application','my_notes') { if ($c[$h]) { $ws.Cells.Item(1, $c[$h]).Interior.Color = 0x99FFFF } }
+  if ($c['application'] -and $last -ge 2) {
+    $v = $ws.Range($ws.Cells.Item(2, $c['application']), $ws.Cells.Item($last, $c['application'])).Validation
+    $v.Delete()
+    $v.Add(3, 1, 1, 'not applied,applied,skipped,hide')
+    $v.IgnoreBlank = $true
+    $v.ShowError = $false
+    $v.InputTitle = 'Application'
+    $v.InputMessage = 'Pick applied, skipped (not interested), not applied, or hide (remove from the list). Saved at the next update.'
+  }
+  if ($c['fit'] -and $last -ge 2) {
+    $v = $ws.Range($ws.Cells.Item(2, $c['fit']), $ws.Cells.Item($last, $c['fit'])).Validation
+    $v.Delete()
+    $v.Add(1, 1, 1, '0', '100')
+    $v.ErrorMessage = 'Fit must be a number from 0 to 100.'
   }
   $ws.Columns.Item($c['link']).ColumnWidth = 14
   $ws.Range($ws.Cells.Item(2, $c['link']), $ws.Cells.Item([Math]::Max($last, 2), $c['link'])).HorizontalAlignment = 5
