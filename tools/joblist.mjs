@@ -7,6 +7,7 @@
 //   node tools/joblist.mjs note J0012 "text"           note shown in the Excel "notes" column ("" clears it)
 //   node tools/joblist.mjs hide J0012 J0013 --reason "not a dev role"     remove from the Excel (kept so it never comes back)
 //   node tools/joblist.mjs unhide J0012
+//   node tools/joblist.mjs keep J0012                  dismiss a wrong "graduate requirement" flag
 //   node tools/joblist.mjs mark J0012 applied|skipped|clear [--date YYYY-MM-DD]   for jobs applied outside /apply
 //   node tools/joblist.mjs check [--all] [J0012 ...]   still open? application deadline? (careers site of each job)
 //   node tools/joblist.mjs build                       writes job_listing.xlsx (+ joblist/job_listing.csv); Excel file must be closed
@@ -221,7 +222,33 @@ export function findDeadline(text) {
   for (const m of t.matchAll(KEY)) { const d = firstDate(m[0]); if (d) dates.push(d); }
   return dates.sort()[0] || null;
 }
-const CLOSED_TEXT = /no longer (accepting applications|available|open|active|accepting)|this (job|position|posting|requisition|opportunity) (is )?(no longer|has (been )?(closed|expired|filled))|position has been filled|job (posting )?has expired|posting has expired|n'est plus (disponible|accessible)|offre (d'emploi )?(n'est plus|a expire)/i;
+// Graduate requirement in the posting: graduate students only (Master's / PhD) or a completed degree required.
+// Returns { kind, snippet } for Claude to review (it never hides by itself), or null.
+const UNDERGRAD = /bachelor|undergrad|baccalaur|\bb\.?\s?s\.?c?\b|\bbeng\b|\bb\.?a\.?sc|\bb\.?eng|\bbs\s?\/|\bba\b|1st|2nd|3rd|first|second|third|sophomore|junior|senior year|any level/i;
+export function findGradRequirement(text) {
+  const t = String(text || '').replace(/\s+/g, ' ');
+  const around = (i, len) => t.slice(Math.max(0, i - 120), i + len + 120);
+  const rules = [
+    ['graduate students only', /\b(?:ph\.?\s?d|master'?s|graduate) (?:students?|candidates?) only\b|open (?:only )?to (?:master'?s|ph\.?\s?d|graduate) students|(?:must|need to) be (?:currently )?enrolled in a (?:master'?s|ph\.?\s?d|doctoral|graduate)/i, false],
+    ['graduate students only', /(?:currently |actively )?(?:enrolled|pursuing|working towards?|candidate for)[^.;]{0,60}\b(?:master'?s|m\.?\s?sc|ph\.?\s?d|doctoral|doctorate|graduate (?:degree|program|studies|school))\b/i, true],
+    ['degree completed', /\b(?:must|should|required to) (?:have|hold) (?:completed|obtained|earned|graduated)[^.;]{0,60}(?:degree|bachelor|diploma)|\bdegree (?:must be )?(?:completed|conferred) (?:by|before|prior to)|\bgraduated (?:within|in) the (?:last|past)|\bnot (?:be )?currently enrolled|\bmust have graduated\b/i, false],
+  ];
+  for (const [kind, re, needsNoUndergrad] of rules) {
+    const m = t.match(re);
+    if (!m) continue;
+    const win = around(m.index, m[0].length);
+    if (needsNoUndergrad && UNDERGRAD.test(win)) continue;
+    // a wish, not a requirement: "(preferred)", "Desired qualifications: pursuing MS or PhD"
+    const before = t.slice(Math.max(0, m.index - 45), m.index), after = t.slice(m.index + m[0].length, m.index + m[0].length + 100);
+    if (/(preferred|desired|nice[- ]to[- ]have|bonus)(?: qualifications?| skills| requirements)?\s*:?\s*$/i.test(before) || /^[^.;]{0,100}?\b(preferred|is a plus|an asset|nice to have|bonus)\b/i.test(after)) continue;
+    // "completed degree" rules: skip when students are also accepted, or when it's a form question ("Yes / No, I am…")
+    if (kind === 'degree completed' && (/currently enrolled in a (bachelor|undergrad)|students?\b|\byes\b.{0,40}\bno\b/i.test(win))) continue;
+    return { kind, snippet: win.trim() };
+  }
+  return null;
+}
+
+const CLOSED_TEXT =/no longer (accepting applications|available|open|active|accepting)|this (job|position|posting|requisition|opportunity) (is )?(no longer|has (been )?(closed|expired|filled))|position has been filled|job (posting )?has expired|posting has expired|n'est plus (disponible|accessible)|offre (d'emploi )?(n'est plus|a expire)/i;
 
 // cached as promises so parallel checks share one lookup
 const ghBoards = new Map();
@@ -251,7 +278,7 @@ export async function checkPosting(job) {
   const host = u.host.toLowerCase();
   const done = (status, detail, text, deadline, deadline_source) => {
     const d = deadline || findDeadline(text);
-    return { status, detail, deadline: d || null, deadline_source: d ? deadline_source || 'posting text' : null };
+    return { status, detail, deadline: d || null, deadline_source: d ? deadline_source || 'posting text' : null, grad: findGradRequirement(text) };
   };
 
   // Workday
@@ -374,6 +401,13 @@ async function cmdCheck() {
     j.posting_status = r.status;
     j.check_detail = r.detail;
     if (r.status !== 'unknown') { j.deadline = r.deadline || undefined; j.deadline_source = r.deadline_source || undefined; } // re-read each time (the posting can change)
+    if (r.status !== 'unknown') {
+      const g = r.grad
+        || (/\bgraduate (intern|student|co-?op)\b|\bgrad intern\b/i.test(j.title) ? { kind: 'graduate students only', snippet: 'title: ' + j.title } : null)
+        || (j.type === 'Full-time (new grad)' ? { kind: 'degree completed', snippet: 'full-time new-grad role (starts after graduation)' } : null);
+      j.grad_flag = g?.kind;
+      j.grad_snippet = g?.snippet;
+    }
     j.last_checked = today();
     if (++done % 25 === 0) console.log(`  ${done}/${jobs.length}`);
   });
@@ -382,6 +416,11 @@ async function cmdCheck() {
   console.log(`open: ${count('open')} · closed: ${count('closed')} · unknown: ${count('unknown')} · with a deadline: ${jobs.filter((j) => j.deadline).length}`);
   const newlyClosed = jobs.filter((j) => j.posting_status === 'closed' && before[j.key] !== 'closed');
   if (newlyClosed.length) { console.log('\nNow closed:'); printJobs(newlyClosed); }
+  const flagged = store.jobs.filter((j) => !j.hidden && j.grad_flag && !j.grad_ok);
+  if (flagged.length) {
+    console.log(`\nGraduate requirement found (review, then hide or keep): ${flagged.length}`);
+    flagged.forEach((j) => console.log(`${j.key} | ${j.grad_flag} | ${j.company} | ${j.title}\n      "${String(j.grad_snippet).slice(0, 260)}"`));
+  }
   const soon = jobs.filter((j) => j.deadline && j.deadline >= today() && j.deadline <= addDays(today(), cfg.deadline_soon_days) && j.posting_status !== 'closed');
   if (soon.length) { console.log(`\nDeadline within ${cfg.deadline_soon_days} days:`); soon.forEach((j) => console.log(`${j.deadline} | ${j.key} | ${j.company} | ${j.title}`)); }
 }
@@ -569,6 +608,7 @@ function cmdImportCsv() {
 const commands = {
   fetch: cmdFetch, check: cmdCheck, build: cmdBuild, fit: cmdFit, note: cmdNote, mark: cmdMark, 'import-csv': cmdImportCsv,
   hide: () => cmdHide(true), unhide: () => cmdHide(false),
+  keep: () => { for (const k of positional) { const j = byKey(k) || die(`No job ${k}`); j.grad_ok = true; } save(); console.log(`Kept (graduate flag dismissed): ${positional.length}`); },
   pending: () => { const p = store.jobs.filter((j) => !j.hidden && j.fit == null && j.category !== 'defense (not eligible)'); console.log(`${p.length} job(s) without a fit score:`); printJobs(p); },
   show: () => console.log(JSON.stringify(byKey(positional[0]) || die('No such job'), null, 2)),
 };
