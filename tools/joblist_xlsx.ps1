@@ -47,7 +47,11 @@ try {
   $hdr = $ws.Range($ws.Cells.Item(1, 1), $ws.Cells.Item(1, $ncol))
   $hdr.Font.Bold = $true
   $hdr.Interior.Color = 0xE6D8C9
-  $ws.Range($ws.Cells.Item(1, 1), $ws.Cells.Item($last, $ncol)).AutoFilter() | Out-Null
+  # Excel Table: filter buttons on every column, always on, filters combine across columns
+  $lo = $ws.ListObjects.Add(1, $ws.Range($ws.Cells.Item(1, 1), $ws.Cells.Item($last, $ncol)), $null, 1)
+  $lo.Name = 'Jobs'
+  $lo.TableStyle = 'TableStyleLight1'
+  $lo.ShowAutoFilterDropDown = $true
   $ws.Activate()
   $xl.ActiveWindow.SplitRow = 1
   $xl.ActiveWindow.FreezePanes = $true
