@@ -32,10 +32,10 @@ const DEFAULT_CONFIG = {
     { name: 'co-ops, all companies', employmentType: 'CO_OP', topTierOnly: false, keep: 'canada+usa' },
   ],
   // community GitHub lists (JSON behind the README). Only open postings (no 🔒), dev titles, Canada,
-  // or US when the company is already in the list (Runway / applications) AND the posting offers sponsorship.
+  // or US when the company is already in the list (Runway / applications), unless the posting says no sponsorship / US citizenship required.
   github_sources: [
     { name: 'GitHub (Summer2027-Internships)', url: 'https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json',
-      seasons: ['Summer', 'Fall', 'Winter', 'Spring', 'Spring/Summer'], max_age_days: 180, us_needs_known_company: true, us_needs_sponsorship: true },
+      seasons: ['Summer', 'Fall', 'Winter', 'Spring', 'Spring/Summer'], max_age_days: 180, us_needs_known_company: true, us_skip_sponsorship: ['Does Not Offer Sponsorship', 'U.S. Citizenship is Required'] },
   ],
   first_fetch_days: 21,
   max_pages_per_source: 400,
@@ -57,7 +57,7 @@ const DEV = /software|develop|d[ée]velopp|logiciel|full[- ]?stack|back[- ]?end|
 const NOT_DEV = /ph\.?d|doctora|postdoc|master'?s|\bmba\b|marketing|sales|account(ing|ant)|finance|financial|\bart\b|artist|recruit|\bhr\b|human resources|people partner|legal|mechanical|civil eng|chemical|electrical eng|hardware eng|manufacturing|supply chain|business development|communications|content|copywrit|underwrit|audit|research scientist|construction|environmental|process eng|product design|industrial design|editorial|sports programming|television|film|wealth|tax\b|actuar|nurs|pharma|clinical|biolog|chemist|field (service )?eng|traffic|water|rail\b|structural|optical|photonic|\brf\b|analog|thermal|materials|industrial eng|procurement|asset management|debt|transmission|distribution eng|substation|geotech|survey|hvac|facilities/i;
 const CA = /canada|ontario|qu[ée]bec|british columbia|alberta|manitoba|nova scotia|saskatchewan|new brunswick|newfoundland|prince edward/i;
 const US = /united states|\busa\b|remote|, (alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming|district of columbia)\b/i;
-const DEFENSE = /northrop|l3harris|leidos|\bcaci\b|\bkbr\b|lockheed|raytheon|\brtx\b|general dynamics|bae systems|booz allen|\bsaic\b|federal reserve|\bmitre\b|jet propulsion|\bnasa\b|anduril|huntington ingalls|peraton|sandia|livermore|los alamos|amentum/i;
+const DEFENSE = /northrop|l3harris|leidos|\bcaci\b|\bkbr\b|lockheed|raytheon|\brtx\b|general dynamics|bae systems|booz allen|\bsaic\b|federal reserve|\bmitre\b|jet propulsion|\bnasa\b|anduril|huntington ingalls|peraton|sandia|johns hopkins (apl|applied physics)|livermore|los alamos|amentum/i;
 
 export function isDev(title) {
   const t = String(title).replace(/bachelor'?s\s*\/\s*master'?s/i, 'bachelors');
@@ -210,9 +210,12 @@ async function fetchGithub(src, added, dry) {
   if (!Array.isArray(list)) { console.log(`${src.name}: could not read the list (${r.status || r.error})`); return res; }
   // "companies already in the list" = Runway jobs (incl. top-tier source) + application folders, not jobs added from GitHub itself
   const known = [...store.jobs.filter((j) => j.runway_id || !j.gh_id).map((j) => j.company), ...loadApplications().map((a) => a.company)].filter(Boolean);
-  const isKnown = (co) => known.some((k) => sameCompany(k, co));
+  // stricter than sameCompany: same name once legal suffixes are removed, or one name starting with the other (Rivian / Rivian and VW)
+  const coKey = (s) => String(s || '').toLowerCase().replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|plc|group|holdings|technologies|technology|the)\b.?/g, '').replace(/[^a-z0-9]/g, '');
+  const knownKeys = [...new Set(known.map(coKey).filter((k) => k.length >= 3))];
+  const isKnown = (co) => { const a = coKey(co); return a.length >= 3 && knownKeys.some((k) => a === k || (k.length >= 4 && a.startsWith(k)) || (a.length >= 4 && k.startsWith(a))); };
   const minDate = addDays(today(), -(src.max_age_days || 180));
-  const skip = { locked: 0, season: 0, old: 0, country: 0, not_dev: 0, us_no_sponsorship: 0, us_unknown_company: 0 };
+  const skip = { locked: 0, season: 0, old: 0, country: 0, not_dev: 0, us_no_sponsorship: 0, us_defense: 0, us_unknown_company: 0 };
   const closedNow = [], candidates = [];
   for (const x of list) {
     if (x.is_visible === false) continue;
@@ -238,7 +241,8 @@ async function fetchGithub(src, added, dry) {
     const title = String(x.title || '').replace(/[🛂🔒]|🇺🇸/gu, '').trim();
     if (!isDev(title)) { skip.not_dev++; continue; }
     if (country === 'USA') {
-      if (src.us_needs_sponsorship && x.sponsorship !== 'Offers Sponsorship') { skip.us_no_sponsorship++; continue; }
+      if ((src.us_skip_sponsorship || []).includes(x.sponsorship)) { skip.us_no_sponsorship++; continue; }
+      if (DEFENSE.test(x.company_name)) { skip.us_defense++; continue; } // US defense = citizenship / clearance
       if (src.us_needs_known_company && !isKnown(x.company_name)) { skip.us_unknown_company++; continue; }
     }
     res.dev++;
@@ -257,7 +261,7 @@ async function fetchGithub(src, added, dry) {
       key: nextKey(), gh_id: x.id, company: x.company_name, title, location: locs.join('; '), country,
       work_mode: /remote/i.test(locs.join(' ')) ? 'Remote' : '', type: typeOf(title), category: categoryOf(title, x.company_name),
       date_posted: posted, apply_url: url, gh_url: x.url, term: x.season || '', source: src.name,
-      fit: null, notes: [x.season && x.season !== 'Summer' ? `${x.season} term (check the year)` : '', country === 'USA' ? 'offers sponsorship (GitHub list)' : ''].filter(Boolean).join('; '),
+      fit: null, notes: [x.season && x.season !== 'Summer' ? `${x.season} term (check the year)` : '', country === 'USA' ? (x.sponsorship === 'Offers Sponsorship' ? 'offers sponsorship (GitHub list)' : 'sponsorship not mentioned (check)') : ''].filter(Boolean).join('; '),
       hidden: false, first_seen: today(), last_seen_github: today(),
     };
     if (!dry) store.jobs.push(nj); else nj.key = '(new)';
