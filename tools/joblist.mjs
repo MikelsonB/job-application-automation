@@ -2,7 +2,6 @@
 // Runway is read through its public API (no browser, no login, no personal data sent).
 //
 //   node tools/joblist.mjs fetch [--days N] [--only runway|github] [--dry]   new postings from Runway + GitHub lists → adds the development roles
-//   node tools/joblist.mjs toptier                     collect the companies Runway tags top-tier (used for US jobs from GitHub lists)
 //   node tools/joblist.mjs pending                     new jobs that still need a fit score (or to be hidden)
 //   node tools/joblist.mjs fit J0012=75 J0013=60       set fit scores (%)
 //   node tools/joblist.mjs note J0012 "text"           note shown in the Excel "notes" column ("" clears it)
@@ -33,11 +32,13 @@ const DEFAULT_CONFIG = {
     { name: 'co-ops, all companies', employmentType: 'CO_OP', topTierOnly: false, keep: 'canada+usa' },
   ],
   // community GitHub lists (JSON behind the README). Only open postings (no 🔒), dev titles, Canada,
-  // or US when Runway tags the company top-tier, unless the posting says no sponsorship / US citizenship required.
+  // or US when the company is in us_top_tier_companies, unless the posting says no sponsorship / US citizenship required.
   github_sources: [
     { name: 'GitHub (Summer2027-Internships)', url: 'https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json',
       seasons: ['Summer', 'Fall', 'Winter', 'Spring', 'Spring/Summer'], max_age_days: 180, us_needs_top_tier: true, us_skip_sponsorship: ['Does Not Offer Sponsorship', 'U.S. Citizenship is Required'] },
   ],
+  // US top-tier = FAANG+ (Simplify / Pitt CSC 🔥 tag) + top quant firms + AI labs (Mikelson's choice, 2026-11-13)
+  us_top_tier_companies: ["Adobe", "Airbnb", "Amazon", "AMD", "Apple", "Atlassian", "ByteDance", "Cloudflare", "Coinbase", "CrowdStrike", "Databricks", "Datadog", "DoorDash", "Dropbox", "Duolingo", "Figma", "Google", "Intel", "LinkedIn", "Lyft", "Meta", "Microsoft", "Netflix", "Notion", "NVIDIA", "Palantir", "PayPal", "Pinterest", "Rippling", "Robinhood", "Roblox", "Salesforce", "ServiceNow", "Snap", "Snowflake", "SpaceX", "Stripe", "Tesla", "TikTok", "Tinder", "Visa", "Waymo", "Jane Street", "Citadel", "Two Sigma", "Hudson River Trading", "Jump Trading", "DRW", "IMC", "Optiver", "Susquehanna", "D. E. Shaw", "Point72", "Millennium", "Five Rings", "Akuna Capital", "OpenAI", "Anthropic", "Scale AI", "xAI", "Perplexity", "Cohere"],
   first_fetch_days: 21,
   max_pages_per_source: 400,
   canada_bonus: 8,
@@ -145,7 +146,6 @@ async function cmdFetch() {
       pages++;
       for (const r of d.jobs) {
         n++; scanned++;
-        if (src.topTierOnly) addTopTier(r.company);
         const posted = new Date(r.postedAt).toLocaleDateString('en-CA');
         if (posted > newest) newest = posted;
         const country = countryOf(r.location);
@@ -186,36 +186,19 @@ async function cmdFetch() {
   if (added.length) { console.log('\nNew jobs (need a fit score or hide):'); printJobs(added); }
 }
 
-// ---------- Runway top-tier companies ----------
-// Runway has no "top-tier" field per job: a company is top-tier when it shows up with the topTierOnly filter on.
-// stricter than sameCompany: same name once legal suffixes are removed, or one name starting with the other (Rivian / Rivian and VW)
-const coKey = (s) => String(s || '').toLowerCase().replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|plc|group|holdings|technologies|technology|the)\b\.?/g, '').replace(/[^a-z0-9]/g, '');
-const topTierNames = () => [...new Set([...(store.top_tier_companies || []), ...store.jobs.filter((j) => /top-tier/.test(j.source || '')).map((j) => j.company)])];
-function addTopTier(company) {
-  if (!company) return false;
-  store.top_tier_companies ||= [];
-  if (store.top_tier_companies.includes(company)) return false;
-  store.top_tier_companies.push(company);
-  return true;
-}
-// one-time / occasional: scan every top-tier page on Runway (internships, co-ops, full-time) to collect the company names
-async function cmdTopTier() {
-  const before = topTierNames().length;
-  for (const employmentType of ['INTERNSHIP', 'CO_OP', 'FULL_TIME']) {
-    let cursor = null, pages = 0, n = 0;
-    while (pages < cfg.max_pages_per_source) {
-      const d = await runwayPage({ employmentType, topTierOnly: true }, cursor);
-      pages++;
-      for (const r of d.jobs) { n++; addTopTier(r.company); }
-      if (!d.nextCursor || !d.jobs.length) break;
-      cursor = d.nextCursor;
-    }
-    console.log(`Runway top-tier ${employmentType}: ${n} postings scanned (${pages} pages)`);
-  }
-  save();
-  const all = topTierNames();
-  console.log(`Top-tier companies known: ${all.length} (+${all.length - before})`);
-}
+// ---------- US top-tier companies (config us_top_tier_companies) ----------
+// FAANG+ (the 🔥 tag of the Simplify / Pitt CSC internship list) + top quant firms + AI labs (Mikelson's choice, 2026-11-13).
+// Match: same words once legal suffixes are removed, or the posting's company starting with the whole name
+// ("Amazon.com Services LLC" = Amazon, "Palantir Technologies" = Palantir; "Metalenz" ≠ Meta).
+const coWords = (s) => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\b(inc|corp|corporation|co|company|llc|ltd|limited|plc|group|holdings|technologies|technology|the)\b/g, ' ').replace(/\s+/g, ' ').trim();
+const isTopTierUS = (co) => {
+  const a = coWords(co), compact = a.replace(/ /g, '');
+  return !!a && (cfg.us_top_tier_companies || []).some((name) => {
+    const k = coWords(name);
+    return k && (a === k || compact === k.replace(/ /g, '') || a.startsWith(k + ' ') || compact.startsWith(k.replace(/ /g, '') + 'com'));
+  });
+};
 
 // ---------- GitHub internship lists ----------
 // one location string → Canada / USA / Other (province or "Canada" first, then a US state code, then Canadian city names)
@@ -241,10 +224,6 @@ async function fetchGithub(src, added, dry) {
   const r = await get(src.url);
   const list = r.status === 200 ? json(r.text) : null;
   if (!Array.isArray(list)) { console.log(`${src.name}: could not read the list (${r.status || r.error})`); return res; }
-  // US jobs: only companies Runway tags top-tier (store.top_tier_companies, filled by `fetch` and `toptier`)
-  const tierKeys = [...new Set(topTierNames().map(coKey).filter((k) => k.length >= 3))];
-  if (src.us_needs_top_tier && !tierKeys.length) console.log('  No top-tier companies known yet: run `node tools/joblist.mjs toptier` first (US jobs are all skipped).');
-  const isTopTier = (co) => { const a = coKey(co); return a.length >= 3 && tierKeys.some((k) => a === k || (k.length >= 4 && a.startsWith(k))); };
   const minDate = addDays(today(), -(src.max_age_days || 180));
   const skip = { locked: 0, season: 0, old: 0, country: 0, not_dev: 0, us_no_sponsorship: 0, us_defense: 0, us_not_top_tier: 0 };
   const closedNow = [], candidates = [];
@@ -274,7 +253,7 @@ async function fetchGithub(src, added, dry) {
     if (country === 'USA') {
       if ((src.us_skip_sponsorship || []).includes(x.sponsorship)) { skip.us_no_sponsorship++; continue; }
       if (DEFENSE.test(x.company_name)) { skip.us_defense++; continue; } // US defense = citizenship / clearance
-      if (src.us_needs_top_tier && !isTopTier(x.company_name)) { skip.us_not_top_tier++; continue; }
+      if (src.us_needs_top_tier && !isTopTierUS(x.company_name)) { skip.us_not_top_tier++; continue; }
     }
     res.dev++;
     candidates.push({ x, title, posted, country, locs });
@@ -750,7 +729,7 @@ function cmdImportCsv() {
 }
 
 const commands = {
-  fetch: cmdFetch, toptier: cmdTopTier, check: cmdCheck, build: cmdBuild, fit: cmdFit, note: cmdNote, mark: cmdMark, 'import-csv': cmdImportCsv,
+  fetch: cmdFetch, check: cmdCheck, build: cmdBuild, fit: cmdFit, note: cmdNote, mark: cmdMark, 'import-csv': cmdImportCsv,
   hide: () => cmdHide(true), unhide: () => cmdHide(false),
   keep: () => { for (const k of positional) { const j = byKey(k) || die(`No job ${k}`); j.grad_ok = true; } save(); console.log(`Kept (graduate flag dismissed): ${positional.length}`); },
   pending: () => { const p = store.jobs.filter((j) => !j.hidden && j.fit == null && j.category !== 'defense (not eligible)'); console.log(`${p.length} job(s) without a fit score:`); printJobs(p); },
