@@ -1,7 +1,7 @@
-// Job listing: development roles from Runway (app.joinrunway.io/explore) → joblist/joblist.json → job_listing.xlsx
+// Job listing: development roles from Runway (app.joinrunway.io/explore) + community GitHub internship lists → joblist/joblist.json → job_listing.xlsx
 // Runway is read through its public API (no browser, no login, no personal data sent).
 //
-//   node tools/joblist.mjs fetch [--days N]            new postings from Runway → adds the development roles
+//   node tools/joblist.mjs fetch [--days N] [--only runway|github] [--dry]   new postings from Runway + GitHub lists → adds the development roles
 //   node tools/joblist.mjs pending                     new jobs that still need a fit score (or to be hidden)
 //   node tools/joblist.mjs fit J0012=75 J0013=60       set fit scores (%)
 //   node tools/joblist.mjs note J0012 "text"           note shown in the Excel "notes" column ("" clears it)
@@ -30,6 +30,12 @@ const DEFAULT_CONFIG = {
     { name: 'internships, top-tier companies', employmentType: 'INTERNSHIP', topTierOnly: true, keep: 'canada+usa' },
     { name: 'internships, all companies (Canada only)', employmentType: 'INTERNSHIP', topTierOnly: false, keep: 'canada' },
     { name: 'co-ops, all companies', employmentType: 'CO_OP', topTierOnly: false, keep: 'canada+usa' },
+  ],
+  // community GitHub lists (JSON behind the README). Only open postings (no 🔒), dev titles, Canada,
+  // or US when the company is already in the list (Runway / applications) AND the posting offers sponsorship.
+  github_sources: [
+    { name: 'GitHub (Summer2027-Internships)', url: 'https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json',
+      seasons: ['Summer', 'Fall', 'Winter', 'Spring', 'Spring/Summer'], max_age_days: 180, us_needs_known_company: true, us_needs_sponsorship: true },
   ],
   first_fetch_days: 21,
   max_pages_per_source: 400,
@@ -125,9 +131,11 @@ async function runwayPage(src, cursor) {
 
 async function cmdFetch() {
   const days = opt('--days');
+  const only = opt('--only'); // runway | github
+  const dry = flag('--dry');  // show what would be added, change nothing
   const added = [];
   let scanned = 0, dev = 0, updated = 0;
-  for (const src of cfg.sources) {
+  for (const src of only === 'github' ? [] : cfg.sources) {
     const last = store.last_fetch?.[src.name];
     const since = days ? addDays(today(), -Number(days)) : last ? addDays(last, -2) : addDays(today(), -cfg.first_fetch_days);
     let cursor = null, pages = 0, newest = last || '', n = 0;
@@ -167,9 +175,98 @@ async function cmdFetch() {
     store.last_fetch[src.name] = newest || today();
     console.log(`${src.name}: ${n} postings scanned (${pages} pages, since ${since})`);
   }
-  save();
-  console.log(`\nScanned ${scanned} postings · ${dev} development roles · ${added.length} NEW · ${updated} already in the list`);
+  for (const src of only === 'runway' ? [] : cfg.github_sources || []) {
+    const r = await fetchGithub(src, added, dry);
+    scanned += r.scanned; dev += r.dev; updated += r.updated;
+  }
+  if (!dry) save();
+  console.log(`\n${dry ? '[dry run, nothing saved] ' : ''}Scanned ${scanned} postings · ${dev} development roles kept · ${added.length} NEW · ${updated} already in the list`);
   if (added.length) { console.log('\nNew jobs (need a fit score or hide):'); printJobs(added); }
+}
+
+// ---------- GitHub internship lists ----------
+// one location string → Canada / USA / Other (province or "Canada" first, then a US state code, then Canadian city names)
+const ghLocCountry = (l) => (CA.test(l) || /\bCAN\b|, (ON|QC|BC|AB|MB|NS|SK|NB|NL|PE)\b/.test(l) ? 'Canada'
+  : US.test(l) || /, [A-Z]{2}\b/.test(l) ? 'USA'
+  : /toronto|montr[eé]al|vancouver|ottawa|waterloo|calgary|edmonton|kanata|mississauga|markham|kitchener|halifax|winnipeg|burnaby/i.test(l) ? 'Canada'
+  : /united states|\bUSA?\b|remote/i.test(l) ? 'USA' : 'Other');
+const ghCountry = (locs) => { const c = locs.map(ghLocCountry); return c.includes('Canada') ? 'Canada' : c.includes('USA') ? 'USA' : 'Other'; };
+const normTitle = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// the list links through a short-link service: follow one redirect to get the company's own careers page
+async function resolveShort(u) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await fetch(u, { redirect: 'manual', headers: { 'user-agent': UA }, signal: AbortSignal.timeout(15000) });
+      const loc = r.headers.get('location');
+      if (loc) return cleanUrl(new URL(loc, u).toString());
+    } catch { /* retry once */ }
+  }
+  return u;
+}
+async function fetchGithub(src, added, dry) {
+  const res = { scanned: 0, dev: 0, updated: 0 };
+  const r = await get(src.url);
+  const list = r.status === 200 ? json(r.text) : null;
+  if (!Array.isArray(list)) { console.log(`${src.name}: could not read the list (${r.status || r.error})`); return res; }
+  // "companies already in the list" = Runway jobs (incl. top-tier source) + application folders, not jobs added from GitHub itself
+  const known = [...store.jobs.filter((j) => j.runway_id || !j.gh_id).map((j) => j.company), ...loadApplications().map((a) => a.company)].filter(Boolean);
+  const isKnown = (co) => known.some((k) => sameCompany(k, co));
+  const minDate = addDays(today(), -(src.max_age_days || 180));
+  const skip = { locked: 0, season: 0, old: 0, country: 0, not_dev: 0, us_no_sponsorship: 0, us_unknown_company: 0 };
+  const closedNow = [], candidates = [];
+  for (const x of list) {
+    if (x.is_visible === false) continue;
+    res.scanned++;
+    const existing = store.jobs.find((j) => j.gh_id === x.id);
+    if (existing) {
+      res.updated++;
+      existing.last_seen_github = today();
+      // 🔒 on the list = applications closed
+      if (!x.active && existing.posting_status !== 'closed') {
+        Object.assign(existing, { posting_status: 'closed', check_detail: 'locked (closed) on the GitHub list', last_checked: today(), deadline: undefined });
+        closedNow.push(existing);
+      }
+      continue;
+    }
+    if (!x.active) { skip.locked++; continue; }
+    if (src.seasons && !src.seasons.includes(x.season)) { skip.season++; continue; }
+    const posted = new Date(x.date_posted * 1000).toLocaleDateString('en-CA');
+    if (posted < minDate) { skip.old++; continue; }
+    const locs = (x.locations || []).map(String);
+    const country = ghCountry(locs);
+    if (country === 'Other') { skip.country++; continue; }
+    const title = String(x.title || '').replace(/[🛂🔒]|🇺🇸/gu, '').trim();
+    if (!isDev(title)) { skip.not_dev++; continue; }
+    if (country === 'USA') {
+      if (src.us_needs_sponsorship && x.sponsorship !== 'Offers Sponsorship') { skip.us_no_sponsorship++; continue; }
+      if (src.us_needs_known_company && !isKnown(x.company_name)) { skip.us_unknown_company++; continue; }
+    }
+    res.dev++;
+    candidates.push({ x, title, posted, country, locs });
+  }
+  await pool(candidates, 8, async (c) => { c.url = await resolveShort(c.x.url); });
+  for (const { x, title, posted, country, locs, url } of candidates) {
+    const job = store.jobs.find((j) => sameJob(j, { company: x.company_name, apply_url: url }))
+      || store.jobs.find((j) => sameCompany(j.company, x.company_name) && normTitle(j.title) === normTitle(title));
+    if (job) { // same job already found on Runway (or earlier): just link it
+      if (!dry) Object.assign(job, { gh_id: x.id, gh_url: x.url, last_seen_github: today() });
+      res.updated++;
+      continue;
+    }
+    const nj = {
+      key: nextKey(), gh_id: x.id, company: x.company_name, title, location: locs.join('; '), country,
+      work_mode: /remote/i.test(locs.join(' ')) ? 'Remote' : '', type: typeOf(title), category: categoryOf(title, x.company_name),
+      date_posted: posted, apply_url: url, gh_url: x.url, term: x.season || '', source: src.name,
+      fit: null, notes: [x.season && x.season !== 'Summer' ? `${x.season} term (check the year)` : '', country === 'USA' ? 'offers sponsorship (GitHub list)' : ''].filter(Boolean).join('; '),
+      hidden: false, first_seen: today(), last_seen_github: today(),
+    };
+    if (!dry) store.jobs.push(nj); else nj.key = '(new)';
+    added.push(nj);
+  }
+  if (!dry) store.last_fetch[src.name] = today();
+  console.log(`${src.name}: ${res.scanned} postings · kept ${res.dev} · skipped ${Object.entries(skip).map(([k, v]) => `${k.replace(/_/g, ' ')} ${v}`).join(', ')}`);
+  if (closedNow.length) { console.log(`Now locked (closed) on ${src.name}: ${closedNow.length}`); printJobs(closedNow); }
+  return res;
 }
 
 const printJobs = (jobs) => jobs.forEach((j) => console.log(`${j.key} | ${j.type} | ${j.country} | ${j.date_posted} | ${j.company} | ${j.title} | ${j.location}`));
@@ -451,6 +548,7 @@ function postingLabel(j) {
   if (j.deadline && j.deadline < today()) return 'deadline passed';
   return j.posting_status || 'not checked';
 }
+const sourceLabel = (j) => { const gh = !!j.gh_id, rw = !!j.runway_id || !String(j.source || '').startsWith('GitHub'); return gh && rw ? 'Runway + GitHub' : gh ? 'GitHub' : 'Runway'; };
 // Excel is editable for 3 columns: my_notes (free text), fit (0-100) and application
 // (applied / skipped / not applied / hide). A cell counts as edited when it differs from what the last build wrote.
 const APP_WORDS = {
@@ -543,10 +641,10 @@ function cmdBuild() {
   let rank = 0;
   for (const r of rows) r.rank = r.rankable ? ++rank : '';
 
-  const cols = ['rank', 'fit', 'application', 'posting', 'deadline', 'date_posted', 'type', 'country', 'company', 'role', 'location', 'category', 'notes', 'my_notes', 'key', 'last_checked', 'link'];
+  const cols = ['rank', 'fit', 'application', 'posting', 'deadline', 'date_posted', 'type', 'country', 'company', 'role', 'location', 'category', 'source', 'notes', 'my_notes', 'key', 'last_checked', 'link'];
   const q = (v) => { const s = v == null ? '' : String(v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const lines = rows.map(({ j, app, posting, rank }) => [rank, j.fit ?? '', app.status, posting, j.deadline || '', j.date_posted || '', j.type, j.country, j.company, j.title, j.location,
-    j.category, [j.notes, j.fit == null && j.category !== 'defense (not eligible)' ? 'fit not scored yet' : ''].filter(Boolean).join('; '), j.my_notes || '', j.key, j.last_checked || '', j.apply_url].map(q).join(','));
+    j.category, sourceLabel(j), [j.notes, j.fit == null && j.category !== 'defense (not eligible)' ? 'fit not scored yet' : ''].filter(Boolean).join('; '), j.my_notes || '', j.key, j.last_checked || '', j.apply_url].map(q).join(','));
   fs.writeFileSync(CSV, '﻿' + [cols.join(','), ...lines].join('\r\n') + '\r\n');
   // remember what this build wrote, so the next build can tell what Mikelson changed in Excel
   for (const { j, app } of rows) j.excel = { fit: j.fit ?? null, application: app.status };

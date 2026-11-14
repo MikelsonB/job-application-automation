@@ -1,12 +1,12 @@
 ---
-description: Update job_listing.xlsx — new Runway postings (dev roles), fit scores, still open or closed, deadlines, applied status
+description: Update job_listing.xlsx — new Runway + GitHub-list postings (dev roles), fit scores, still open or closed, deadlines, applied status
 argument-hint: [check only | days N]
 ---
 Run the "Job listing" workflow from CLAUDE.md (`/updatejoblisting`).
 
 $ARGUMENTS
 
-- Nothing above → full update: fetch new postings from Runway, review + score the new ones, check every posting
+- Nothing above → full update: fetch new postings from Runway and the GitHub internship list, review + score the new ones, check every posting
   (open / closed / deadline), rebuild the Excel file, short report, commit.
 - "check only" → skip the fetch: check postings + rebuild.
 - "days N" → fetch the last N days instead of "since the last update" (`fetch --days N`).
