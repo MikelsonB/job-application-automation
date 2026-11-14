@@ -1,4 +1,4 @@
-// Visual style of the resume, measured from master/Mikelson_Resume_Original.pdf.
+// Visual style of the resume, measured from the original resume (reference: master/Mikelson_Benjamin_Resume.pdf).
 // Do not change these values unless you want to change the look of every document.
 
 // The original renders every font at 97% of its nominal size. Word only accepts
