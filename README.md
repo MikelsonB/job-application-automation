@@ -1,6 +1,25 @@
-# Job Application Workspace
+# Job Application Automation
 
-Open this folder with Claude Code and give it a job posting. Claude already knows the whole process (see `CLAUDE.md`).
+A job/internship application system driven by [Claude Code](https://claude.com/claude-code). Give it a job posting and it:
+
+- analyzes the posting against your resume (fit score, eligibility check, missing keywords),
+- tailors a **one-page resume** and a short cover letter, in English and/or French, built as DOCX + PDF through Microsoft Word,
+- tracks every application (status, follow-ups, response rate) in `tracker.csv`,
+- keeps a ranked Excel list of open development internships from Runway and community GitHub lists,
+- can fill application forms in Chrome (you always submit yourself) and read job emails from Gmail.
+
+The whole workflow lives in `CLAUDE.md` and the slash commands in `.claude/commands/`. The scripts in `tools/` and `templates/` are plain Node.js (`docx` + `yaml`).
+
+## Setup
+
+Requirements: Windows, Node.js 18+, Microsoft Word (for PDF export), Claude Code.
+
+1. `npm install`
+2. Install the Raleway fonts: right-click each file in `assets/fonts/` → **Install**.
+3. Copy `examples/master/` to `master/` and replace the example content with your own resume, answers and extra experience.
+4. `node tools/build.mjs master` to build your reference resume, then open the folder with `claude` and type `/apply <job link>`.
+
+Your personal files (`master/`, `applications/`, `tracker.csv`, `job_listing.xlsx`…) are listed in `.gitignore` so they never end up in a public repo.
 
 ## Daily use
 
@@ -11,7 +30,7 @@ Open this folder with Claude Code and give it a job posting. Claude already know
 | `/apply` with a file in `inbox/` | Same, from a PDF / Word / text file / screenshot you dropped in `inbox/` |
 | "applied" | Marks it applied today, sets a follow-up reminder 10 days later |
 | `/status` | Dashboard: all applications, response rate, deadlines, follow-ups due |
-| `/status ukg interview Nov 3` | Updates a status and saves the details |
+| `/status acme interview Nov 3` | Updates a status and saves the details |
 | `/followups` | What needs a follow-up + email drafts |
 | `/inbox` | Reads your Gmail for job emails (confirmations, tests, interviews, rejections), suggests status updates, adds interviews to Google Calendar after you confirm. Never sends or deletes emails. `/status` runs it automatically. |
 | `/updatejoblisting` | Updates **`job_listing.xlsx`**: new development internships / co-ops from Runway (with the link to the company's own site), a fit % for each, still open or closed, application deadline, and whether you applied. Ranked by priority (Canada first). Closed postings and graduate-only roles (Master's/PhD or new-grad) are removed automatically, except jobs you applied to. `/updatejoblisting check only` = only re-checks open/closed + deadlines. **You can edit 3 columns in Excel (yellow headers), saved at the next update:** `fit` (0-100), `application` (dropdown: applied / skipped / not applied / hide) and `my_notes`. Or tell Claude: "I applied to J0123"; "apply to J0123" starts `/apply` with that job. |
@@ -62,8 +81,8 @@ You:     english
 ```
 Claude:  Not on your resume: Kubernetes? pytest?
          Proposed changes: [before → after]
-You:     kubernetes yes at Avanade, pytest no. changes ok
-Claude:  Resume ready (1 page): Mikelson_Benjamin_Resume.pdf
+You:     kubernetes yes at my last internship, pytest no. changes ok
+Claude:  Resume ready (1 page): <Your_Name>_Resume.pdf
 ```
 **Checkpoint 3 — cover letter**
 ```
@@ -116,15 +135,15 @@ Claude:  Both marked applied today. Follow-up reminders on Nov 6.
 - `applications/<Company>/<date>_<Position>/` — everything for one application (job description, analysis, resume, cover letter, form answers, status history)
 - `tracker.csv` — all applications in one table (open with Excel; it is regenerated automatically)
 - `master/resume.yaml` (English) and `master/resume.fr.yaml` (French) — your master resumes. To change your resume for **all future** applications (new job, new project), ask Claude to update the master.
-- File names: English → `Mikelson_Benjamin_Resume` + `Mikelson_Benjamin_Cover_Letter`; French → `Mikelson_Benjamin_CV` + `Mikelson_Benjamin_Lettre_de_presentation` (each as .pdf and .docx)
+- File names: English → `<Your_Name>_Resume` + `<Your_Name>_Cover_Letter`; French → `<Your_Name>_CV` + `<Your_Name>_Lettre_de_presentation` (each as .pdf and .docx)
 - `master/experience_bank.md` — skills/experience you confirmed that don't fit on one page (Claude fills it as you answer its questions)
 - `master/answer_bank.md` — your answers to application form questions (address, citizenship, graduation date, availability…). Every new question you answer is saved here, so Claude never asks it twice. You can edit it anytime.
 
 ## Good to know
 
-- **Cover letters show your interest, not just your experience.** Each one explains why you want this company and this job, where you are now (last-year Computer Engineering student with several internships), and why you are a great fit, in 3 short paragraphs (~150-250 words) that sound like you. Your resume already lists the details. If Claude doesn't know a personal reason you want the job, it will ask you for one.
-- The resume style is locked to your reference resume / CV (`master/Mikelson_Benjamin_Resume.pdf` and `master/Mikelson_Benjamin_CV.pdf`); the content always has to fit on **one page**.
+- **Cover letters show your interest, not just your experience.** Each one explains why you want this company and this job, where you are now (your program, year and experience), and why you are a great fit, in 3 short paragraphs (~150-250 words) that sound like you. Your resume already lists the details. If Claude doesn't know a personal reason you want the job, it will ask you for one.
+- The resume style is locked to your reference resume / CV (`master/<Your_Name>_Resume.pdf` and `master/<Your_Name>_CV.pdf`); the content always has to fit on **one page**.
 - PDFs are made with Microsoft Word. If a build fails, close the `.docx` in Word and try again.
 - The Raleway font is installed for your Windows user (files in `assets/fonts/`). On a new computer, right-click each `.ttf` → **Install**.
-- Everything is saved in a local git history (no GitHub needed). Your files contain your phone number and email: if you ever push to GitHub, use a **private** repository.
+- Everything is saved in a local git history. Your personal files are git-ignored; keep it that way if the repo is public.
 - Manual build: `node tools/build.mjs applications/<Company>/<folder>` · dashboard: `node tools/tracker.mjs`

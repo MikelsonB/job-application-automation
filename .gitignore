@@ -7,3 +7,16 @@ inbox/*
 !inbox/.gitkeep
 # job listing: temporary CSV (rebuilt by tools/joblist.mjs build)
 joblist/job_listing.csv
+
+# ---- PRIVATE: personal data, never commit to the public repo ----
+master/
+applications/
+tracker.csv
+job_listing.xlsx
+joblist/joblist.json
+joblist/*.csv
+inbox_state.json
+*.pdf
+*.docx
+!examples/**
+.claude/settings.local.json

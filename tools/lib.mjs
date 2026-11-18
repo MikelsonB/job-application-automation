@@ -48,7 +48,7 @@ export function listApplications() {
   return out;
 }
 
-// Accepts a folder path, or a search like "ukg" / "ukg developer" matched against "<Company>/<folder>".
+// Accepts a folder path, or a search like "acme" / "acme developer" matched against "<Company>/<folder>".
 export function findApplication(query) {
   const asPath = path.resolve(ROOT, query);
   if (fs.existsSync(path.join(asPath, 'application.md'))) return asPath;

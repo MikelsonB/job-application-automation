@@ -1,8 +1,8 @@
 // Updates the status of an application, logs it in its history and refreshes tracker.csv.
 //
 //   node tools/status.mjs <folder | search words> <status> [--date YYYY-MM-DD] [--note "text"]
-//   e.g. node tools/status.mjs ukg applied
-//        node tools/status.mjs "ukg developer" interview --date 2026-11-03 --note "Tech interview with Jane"
+//   e.g. node tools/status.mjs acme applied
+//        node tools/status.mjs "acme developer" interview --date 2026-11-03 --note "Tech interview with Jane"
 import { spawnSync } from 'child_process';
 import path from 'path';
 import { ROOT, STATUSES, CLOSED, FOLLOW_UP_DAYS, today, addDays, findApplication, readApplication, writeApplication } from './lib.mjs';

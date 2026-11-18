@@ -1,4 +1,4 @@
-// Resume template — reproduces the layout of the original resume (reference: master/Mikelson_Benjamin_Resume.pdf).
+// Resume template — reproduces the layout of the original resume (reference: the master resume PDF).
 import { Document, Paragraph, ExternalHyperlink, Tab, TabStopType, LevelFormat, AlignmentType, UnderlineType } from 'docx';
 import { COLOR, SIZE, PAGE, TEXT_WIDTH, BULLET_INDENT, SCALE } from './style.mjs';
 import { run, richRuns, createFlow, header, sectionHeading, docDefaults } from './common.mjs';

@@ -1,7 +1,7 @@
 // Creates applications/<Company>/<YYYY-MM-DD>_<Position>/ with application.md,
 // a copy of the master resume in the chosen language(s), and company.md (once per company).
 //
-//   node tools/new.mjs --company "UKG" --position "Software Developer Intern" --lang en|fr|both [--url URL] [--date YYYY-MM-DD]
+//   node tools/new.mjs --company "Acme" --position "Software Developer Intern" --lang en|fr|both [--url URL] [--date YYYY-MM-DD]
 import fs from 'fs';
 import path from 'path';
 import { ROOT, APPS, slug, today } from './lib.mjs';
@@ -34,7 +34,7 @@ company: ${q(company)}
 position: ${q(position)}
 job_id: ""
 url: ${q(opt('--url'))}
-source: ""         # LinkedIn | Indeed | Company site | Concordia CareerConnect | Referral | ...
+source: ""         # LinkedIn | Indeed | Company site | School job board | Referral | ...
 type: ""           # Internship | Co-op | New grad | Full-time | Part-time | Contract
 term: ""           # e.g. Summer 2027
 duration: ""
@@ -43,7 +43,7 @@ work_mode: ""      # On-site | Hybrid | Remote
 salary: ""
 language: ""       # language required by the job: English | French | Bilingual
 apply_language: ${q(lang)}   # documents generated in: en | fr | both
-expected_graduation: "December 2027"   # change only if Mikelson confirms pushing graduation for this job
+expected_graduation: "December 2027"   # change only if the user confirms pushing graduation for this job
 posted: ""
 deadline: ""
 fit_score: ""      # 0-100, from analysis.md

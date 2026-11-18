@@ -1,5 +1,5 @@
 ---
-description: Show the applications dashboard (after checking Gmail for updates), or update a status (e.g. /status ukg interview Nov 3)
+description: Show the applications dashboard (after checking Gmail for updates), or update a status (e.g. /status acme interview Nov 3)
 argument-hint: [company or search words] [new status] [details]
 ---
 Request: $ARGUMENTS

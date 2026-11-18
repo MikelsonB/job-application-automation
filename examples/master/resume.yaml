@@ -1,0 +1,49 @@
+# EXAMPLE MASTER RESUME (fictional person). Copy this folder to master/ and replace everything with your own.
+# Every application starts from a copy of master/resume.yaml.
+# Formatting: wrap text in **double asterisks** to make it bold.
+# Build:  node tools/build.mjs master
+
+lang: en
+name: Alex Example
+contact:
+  - alex.example@example.com
+  - (555) 010-0000
+  - Montreal, QC
+
+# Order of the sections on the page (any of: experience, education, projects, skills)
+sections: [experience, education, projects, skills]
+
+experience:
+  - company: Example Corp
+    title: Software Developer Intern
+    dates: May 2026 - Aug 2026
+    bullets:
+      - "Built a **CI pipeline** in **Python** and **Bash** that runs **automated regression tests** on every merge request."
+      - "Fixed flaky **end-to-end tests**, raising the pass rate from **80% to 95%**."
+
+  - company: Sample Studio
+    title: Web Developer Intern
+    dates: May 2025 - Aug 2025
+    bullets:
+      - "Developed client **web applications** with **React** and **TypeScript** and a **PostgreSQL** backend."
+
+education:
+  - school: Example University
+    dates: Sep 2023 - May 2027
+    details:
+      - Bachelor of Engineering - Computer Engineering
+      - "Relevant coursework: **Data Structures and Algorithms**, **Operating Systems**, **Databases**"
+
+projects:
+  - name: Demo Project
+    url: https://example.com/
+    tech: React, Node.js, PostgreSQL
+    description: "Built a **full-stack** web app with a **React** front end and a **REST API** in **Node.js**."
+
+skills:
+  - label: Languages
+    items: Python, JavaScript, TypeScript, Java, SQL, Bash
+  - label: Frameworks & Data
+    items: React, Node.js, Express, PostgreSQL
+  - label: Cloud & DevOps
+    items: Docker, GitHub Actions, CI/CD, Git, Linux

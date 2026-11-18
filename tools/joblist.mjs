@@ -37,7 +37,7 @@ const DEFAULT_CONFIG = {
     { name: 'GitHub (Summer2027-Internships)', url: 'https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/.github/scripts/listings.json',
       seasons: ['Summer', 'Fall', 'Winter', 'Spring', 'Spring/Summer'], max_age_days: 180, us_needs_top_tier: true, us_skip_sponsorship: ['Does Not Offer Sponsorship', 'U.S. Citizenship is Required'] },
   ],
-  // US top-tier = FAANG+ (Simplify / Pitt CSC 🔥 tag) + top quant firms + AI labs (Mikelson's choice, 2026-11-13)
+  // US top-tier = FAANG+ (Simplify / Pitt CSC 🔥 tag) + top quant firms + AI labs 
   us_top_tier_companies: ["Adobe", "Airbnb", "Amazon", "AMD", "Apple", "Atlassian", "ByteDance", "Cloudflare", "Coinbase", "CrowdStrike", "Databricks", "Datadog", "DoorDash", "Dropbox", "Duolingo", "Figma", "Google", "Intel", "LinkedIn", "Lyft", "Meta", "Microsoft", "Netflix", "Notion", "NVIDIA", "Palantir", "PayPal", "Pinterest", "Rippling", "Robinhood", "Roblox", "Salesforce", "ServiceNow", "Snap", "Snowflake", "SpaceX", "Stripe", "Tesla", "TikTok", "Tinder", "Visa", "Waymo", "Jane Street", "Citadel", "Two Sigma", "Hudson River Trading", "Jump Trading", "DRW", "IMC", "Optiver", "Susquehanna", "D. E. Shaw", "Point72", "Millennium", "Five Rings", "Akuna Capital", "OpenAI", "Anthropic", "Scale AI", "xAI", "Perplexity", "Cohere"],
   first_fetch_days: 21,
   max_pages_per_source: 400,
@@ -187,7 +187,7 @@ async function cmdFetch() {
 }
 
 // ---------- US top-tier companies (config us_top_tier_companies) ----------
-// FAANG+ (the 🔥 tag of the Simplify / Pitt CSC internship list) + top quant firms + AI labs (Mikelson's choice, 2026-11-13).
+// FAANG+ (the 🔥 tag of the Simplify / Pitt CSC internship list) + top quant firms + AI labs .
 // Match: same words once legal suffixes are removed, or the posting's company starting with the whole name
 // ("Amazon.com Services LLC" = Amazon, "Palantir Technologies" = Palantir; "Metalenz" ≠ Meta).
 const coWords = (s) => String(s || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ')
@@ -630,7 +630,7 @@ function cmdBuild() {
     importExcelEdits();
   }
   const apps = loadApplications();
-  // closed postings / deadline passed leave the list automatically, unless Mikelson applied (then they stay, greyed)
+  // closed postings / deadline passed leave the list automatically, unless the user applied (then they stay, greyed)
   const removed = [];
   for (const j of store.jobs.filter((x) => !x.hidden)) {
     const posting = postingLabel(j);
@@ -660,7 +660,7 @@ function cmdBuild() {
   const lines = rows.map(({ j, app, posting, rank }) => [rank, j.fit ?? '', app.status, posting, j.deadline || '', j.date_posted || '', j.type, j.country, j.company, j.title, j.location,
     j.category, sourceLabel(j), [j.notes, j.fit == null && j.category !== 'defense (not eligible)' ? 'fit not scored yet' : ''].filter(Boolean).join('; '), j.my_notes || '', j.key, j.last_checked || '', j.apply_url].map(q).join(','));
   fs.writeFileSync(CSV, '﻿' + [cols.join(','), ...lines].join('\r\n') + '\r\n');
-  // remember what this build wrote, so the next build can tell what Mikelson changed in Excel
+  // remember what this build wrote, so the next build can tell what the user changed in Excel
   for (const { j, app } of rows) j.excel = { fit: j.fit ?? null, application: app.status };
   save();
   const out = execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', PS1, '-Mode', 'write', '-Csv', CSV, '-Xlsx', XLSX, '-Today', today(), '-SoonDays', String(cfg.deadline_soon_days)], { encoding: 'utf8' });
