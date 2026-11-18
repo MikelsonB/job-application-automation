@@ -1,149 +1,144 @@
 # Job Application Automation
 
-A job/internship application system driven by [Claude Code](https://claude.com/claude-code). Give it a job posting and it:
+A job and internship application system driven by [Claude Code](https://claude.com/claude-code).
+Give it a job posting and it:
 
-- analyzes the posting against your resume (fit score, eligibility check, missing keywords),
-- tailors a **one-page resume** and a short cover letter, in English and/or French, built as DOCX + PDF through Microsoft Word,
-- tracks every application (status, follow-ups, response rate) in `tracker.csv`,
-- keeps a ranked Excel list of open development internships from Runway and community GitHub lists,
-- can fill application forms in Chrome (you always submit yourself) and read job emails from Gmail.
+- **analyzes the posting** against your resume: fit score, eligibility check (graduation window, work
+  authorization, language), the keywords to mirror, and the skills you may be missing,
+- **tailors a one-page resume** and a short cover letter, in English and/or French, built as DOCX + PDF
+  through Microsoft Word, without inventing anything that isn't in your resume or confirmed by you,
+- **tracks every application** (status, history, follow-ups, response rate) in `tracker.csv`,
+- **keeps a ranked Excel list** of open development internships and co-ops from Runway and community
+  GitHub internship lists, with fit %, deadlines and open / closed status,
+- **fills application forms** in Chrome from a reusable answer bank (you always submit yourself),
+- **reads job emails** in Gmail and suggests status updates and calendar events.
 
-The whole workflow lives in `CLAUDE.md` and the slash commands in `.claude/commands/`. The scripts in `tools/` and `templates/` are plain Node.js (`docx` + `yaml`).
+The workflow lives in [`CLAUDE.md`](CLAUDE.md) and the slash commands in [`.claude/commands/`](.claude/commands).
+The scripts in `tools/` and `templates/` are plain Node.js (`docx` + `yaml`).
+
+## Contents
+
+- [How it works](#how-it-works)
+- [Setup](#setup)
+- [Claude commands](#claude-commands)
+- [Script commands](#script-commands)
+- [Project structure](#project-structure)
+- [Privacy](#privacy)
+
+## How it works
+
+```
+job posting ──► /apply ──► analysis.md (fit, requirements, keywords, questions)
+                   │
+                   ├─► you answer the questions ──► tailored resume.yaml ──► DOCX + PDF (1 page)
+                   ├─► cover letter draft ──► you approve ──► DOCX + PDF
+                   └─► status "ready" ──► /fill (Chrome) ──► you submit ──► "applied" ──► tracker.csv
+```
+
+- Your resume is a YAML file (`master/resume.yaml`). Each application gets its own copy, which Claude edits.
+- `master/experience_bank.md` stores skills you confirmed that don't fit on one page, so Claude never asks twice.
+- `master/answer_bank.md` stores your answers to form questions, matched by meaning across wordings and languages.
+- The resume layout is fixed in `templates/style.mjs`; every build is checked to be exactly one page.
 
 ## Setup
 
-Requirements: Windows, Node.js 18+, Microsoft Word (for PDF export), Claude Code.
+**Requirements:** Windows, Node.js 18+, Microsoft Word (for PDF export), Claude Code.
+Optional: the Claude in Chrome extension (`/fill`), the Gmail and Google Calendar connectors (`/inbox`).
 
-1. `npm install`
-2. Install the Raleway fonts: right-click each file in `assets/fonts/` → **Install**.
-3. Copy `examples/master/` to `master/` and replace the example content with your own resume, answers and extra experience.
-4. `node tools/build.mjs master` to build your reference resume, then open the folder with `claude` and type `/apply <job link>`.
+```
+git clone https://github.com/MikelsonB/job-application-automation.git
+cd job-application-automation
+npm install
+```
 
-Your personal files (`master/`, `applications/`, `tracker.csv`, `job_listing.xlsx`…) are listed in `.gitignore` so they never end up in a public repo.
+1. Install the Raleway fonts: right-click each file in `assets/fonts/` → **Install**.
+2. Copy `examples/master/` to `master/` and replace the example content with your own resume, answers and
+   extra experience.
+3. Build your reference resume: `node tools/build.mjs master`
+4. Start Claude Code in the folder (`claude`) and type `/apply <job link>`.
 
-## Daily use
+## Claude commands
 
-| You type | What happens |
+| Command | What happens |
 |---|---|
-| `/apply <job link>` (or just paste a link/text) | Claude reads the posting → **you confirm the role and choose the language (English, French or both)** → analysis + questions about missing skills → **you approve resume changes** → resume DOCX + PDF → **you approve the cover letter** → cover letter DOCX + PDF + ready-to-paste form answers |
-| `/quick <job link>` (or `/apply quick <link>`) | **No questions, English only:** Claude picks the graduation date, tailors the resume as much as possible with what's already confirmed (resume + experience bank), builds it, and gives you one report at the end (fit, changes, skills to confirm, files to upload) |
-| `/apply` with a file in `inbox/` | Same, from a PDF / Word / text file / screenshot you dropped in `inbox/` |
-| "applied" | Marks it applied today, sets a follow-up reminder 10 days later |
-| `/status` | Dashboard: all applications, response rate, deadlines, follow-ups due |
-| `/status acme interview Nov 3` | Updates a status and saves the details |
-| `/followups` | What needs a follow-up + email drafts |
-| `/inbox` | Reads your Gmail for job emails (confirmations, tests, interviews, rejections), suggests status updates, adds interviews to Google Calendar after you confirm. Never sends or deletes emails. `/status` runs it automatically. |
-| `/updatejoblisting` | Updates **`job_listing.xlsx`**: new development internships / co-ops from Runway (with the link to the company's own site), a fit % for each, still open or closed, application deadline, and whether you applied. Ranked by priority (Canada first). Closed postings and graduate-only roles (Master's/PhD or new-grad) are removed automatically, except jobs you applied to. `/updatejoblisting check only` = only re-checks open/closed + deadlines. **You can edit 3 columns in Excel (yellow headers), saved at the next update:** `fit` (0-100), `application` (dropdown: applied / skipped / not applied / hide) and `my_notes`. Or tell Claude: "I applied to J0123"; "apply to J0123" starts `/apply` with that job. |
-| `/fill` (or "fill my current tab") | Fills the application form open in your Chrome with what Claude knows, asks you the new questions (and remembers your answers for next time), stops before Next/Submit. You finish and submit. Needs the Claude in Chrome extension. |
+| `/apply <job link>` | Full workflow with 3 checkpoints: confirm the role, eligibility and language → answer questions about missing skills (then the tailored resume is built) → approve the cover letter. |
+| `/apply` (file in `inbox/`) | Same, from a PDF / Word / text file / screenshot dropped in `inbox/`. |
+| `/quick <job link>` | No questions: best tailored resume from what's already confirmed, with one report at the end. |
+| `/fill` | Fills the application form open in Chrome, page by page, and stops before the final Submit. |
+| `/fill all tabs` | Same, for every open application tab, one after the other. |
+| `/status` | Dashboard: counts, response rate, deadlines, follow-ups due (checks Gmail first if connected). |
+| `/status acme interview Nov 3` | Updates one application's status. |
+| `/inbox` | Reads job emails in Gmail and suggests status updates / calendar events. Never sends or deletes email. |
+| `/followups` | Applications needing a follow-up + email drafts. |
+| `/updatejoblisting` | Refreshes `job_listing.xlsx`: new postings, fit %, open / closed, deadlines, applied status. |
 
-You always apply yourself, with the PDF (or DOCX) files from the application's folder.
+In plain words: "applied" marks the current application as applied (follow-up in 10 days), "prep me for Acme"
+prepares an interview, "apply to J0123" starts `/apply` on a job from the Excel list.
 
-## A typical day (example)
+**Statuses:** `drafting` → `ready` → `applied` → `assessment` → `interview` → `offer` → `accepted` / `declined`,
+plus `rejected`, `ghosted`, `withdrawn`.
 
-> Company names, dates and answers below are examples.
+## Script commands
 
-### 1. Start (1 min)
-1. Open **Chrome**: be logged in to Gmail, LinkedIn and the job sites you use (Claude in Chrome extension connected).
-2. Open the **`Job_application`** folder on the Desktop → right-click inside → **Open in Terminal**.
-3. Type **`claude`** and press Enter. Claude reads `CLAUDE.md` automatically.
+Claude runs these itself; you can also run them from the project root.
 
-### 2. What's new: `/status` (2 min)
-`/status` first checks Gmail (`/inbox`), then shows the dashboard.
-```
-You:     /status
-Claude:  Gmail since Oct 26: 2 job emails
-           Shopify   "Online assessment"           applied → assessment (due Nov 4)
-           NovaTech  "Interview invitation Nov 12" applied → interview
-         Update these? Add to Google Calendar?
-You:     yes, add both to calendar
-Claude:  Applications: 8 | applied: 4 | assessment: 1 | interview: 1 | rejected: 2
-         Response rate: 25%
-         Action needed:
-           • FOLLOW UP: Desjardins (applied 10 days ago, no reply)
-           • DEADLINE: Ubisoft posting closes Oct 30 (still "ready", not submitted)
-         Do you want to prepare for the NovaTech interview?
-```
-Then: `/followups` for follow-up email drafts, or "prep me for NovaTech".
+| Command | What it does |
+|---|---|
+| `node tools/new.mjs --company "X" --position "Y" --lang en\|fr\|both [--url URL]` | Creates `applications/<Company>/<date>_<Position>/` with a copy of the master resume(s). |
+| `node tools/build.mjs <folder> [--only resume\|cover] [--lang en\|fr]` | Builds DOCX + PDF through Word. Exit code 2 = more than 1 page. |
+| `node tools/build.mjs master` | Builds the reference resume in `master/`. |
+| `node tools/status.mjs <folder or search words> <status> [--date YYYY-MM-DD] [--note "..."]` | Updates a status (sets the follow-up date when `applied`) and refreshes `tracker.csv`. |
+| `node tools/tracker.mjs` | Rebuilds `tracker.csv` and prints the dashboard. |
+| `node tools/snapshot.mjs <url> <folder>` | Saves a public posting page as PDF (postings disappear once closed). |
+| `node tools/joblist.mjs fetch [--days N] [--only runway\|github] [--dry]` | Gets new development postings. |
+| `node tools/joblist.mjs pending` | New jobs still without a fit score. |
+| `node tools/joblist.mjs fit J0012=75 J0013=60` | Sets fit scores. |
+| `node tools/joblist.mjs note J0012 "text"` | Adds a note. |
+| `node tools/joblist.mjs hide J0012 --reason "..."` / `unhide J0012` | Removes / restores a job. |
+| `node tools/joblist.mjs mark J0012 applied\|skipped\|clear` | Application status for a job without a folder. |
+| `node tools/joblist.mjs check [--all]` | Still open? Deadline? Graduate-only requirement? |
+| `node tools/joblist.mjs build` | Writes `job_listing.xlsx` (exit code 3 = the file is open in Excel). |
+| `node tools/joblist.mjs show J0012` | Everything stored for one job. |
 
-### 3. New jobs: `/apply` (5–10 min per job)
-```
-You:     /apply https://careers.novatech.com/jobs/4521
-```
-**Checkpoint 1 — confirm the role + language**
-```
-Claude:  NovaTech – Software Developer Intern – Winter 2027 – Montreal hybrid
-         Eligibility: ✅ graduation  ✅ work permit  ✅ language
-         Fit: 80/100 — recommended.
-         Language: English, French or both? (I recommend English)
-You:     english
-```
-**Checkpoint 2 — resume changes**
-```
-Claude:  Not on your resume: Kubernetes? pytest?
-         Proposed changes: [before → after]
-You:     kubernetes yes at my last internship, pytest no. changes ok
-Claude:  Resume ready (1 page): <Your_Name>_Resume.pdf
-```
-**Checkpoint 3 — cover letter**
-```
-Claude:  Draft: [letter]
-You:     ok
-Claude:  Cover letter ready. answers.md ready. Status: ready. Files to upload: [paths]
-```
-Repeat for each job — questions already answered are not asked again.
+Job list sources are set in `joblist/config.json` (Runway's public API and the JSON behind a GitHub internship
+list; no login, no personal data sent).
 
-### 4. Apply in the browser: `/fill` (2–5 min per job)
-1. In Chrome, open the application page of each "ready" job, one per tab. Log in where needed.
-2. In Claude:
-```
-You:     /fill all tabs
-Claude:  NovaTech: page 1 filled — stopped before "Next".
-         Shopify: filled — stopped before "Submit".
-         Ubisoft: waiting for you to log in.
-         1 new question: "Expected hourly rate?"
-You:     $28/h, save as default
-```
-3. **You check each tab**, upload the PDFs if needed, click **Next / Submit** yourself. Multi-page form → "continue novatech".
+## Project structure
 
-### 5. Record it (10 sec)
 ```
-You:     applied novatech and shopify
-Claude:  Both marked applied today. Follow-up reminders on Nov 6.
+CLAUDE.md              workflow and rules Claude follows
+.claude/commands/      slash commands (/apply, /quick, /fill, /status, /inbox, /followups, /updatejoblisting)
+tools/                 Node.js scripts (new, build, status, tracker, snapshot, joblist) + PowerShell helpers for Word / Excel
+templates/             resume and cover letter templates (docx), style.mjs = the locked layout
+examples/master/       example resume, answer bank and experience bank (fictional person)
+assets/fonts/          Raleway (SIL Open Font License)
+
+created when you use it (git-ignored):
+master/                your resume (EN/FR), experience bank, answer bank
+applications/          one folder per application: posting, analysis, resume, cover letter, status history
+tracker.csv            all applications
+job_listing.xlsx       ranked list of open roles
 ```
 
-### 6. End of day (optional)
-`/status` for a last look, then close the terminal — everything is saved (folders, tracker, answer bank, git history).
+Resume YAML in short (see `examples/master/resume.yaml`):
 
-### Routine summary
+```yaml
+lang: en                       # en | fr (section titles, file names, French typography)
+name: Alex Example
+contact: [alex.example@example.com, "(555) 010-0000", "Montreal, QC"]
+sections: [experience, education, projects, skills]
+experience:
+  - company: Example Corp
+    title: Software Developer Intern
+    dates: May 2026 - Aug 2026
+    bullets:
+      - "Built a **CI pipeline** in **Python** ..."   # **text** = bold
+```
 
-| When | You type | Time |
-|---|---|---|
-| Start of the day | `/status` (checks Gmail too) | 2 min |
-| New jobs | `/apply <link>` for each | 5–10 min each |
-| Applying | open tabs → `/fill all tabs` → you check & submit | 2–5 min each |
-| After submitting | "applied ..." | 10 sec |
-| Every few days | `/followups` | 5 min |
-| Interview coming | "prep me for <company>" | 15–30 min |
+## Privacy
 
-### One-time setup before the first real day
-1. Install the **Claude in Chrome** extension, sign in, then type `/chrome` in Claude to connect it.
-2. Open a **new Claude session** in this folder so all settings load.
-3. Try it on **one simple job** (Greenhouse or Lever site) and watch each step.
+Everything personal (`master/`, `applications/`, `tracker.csv`, `job_listing.xlsx`, `joblist/joblist.json`,
+`inbox_state.json`, PDFs and DOCX files) is listed in `.gitignore`. Keep it that way if your copy is public,
+or use a private repository for your own data.
 
-## Where things are
-
-- `applications/<Company>/<date>_<Position>/` — everything for one application (job description, analysis, resume, cover letter, form answers, status history)
-- `tracker.csv` — all applications in one table (open with Excel; it is regenerated automatically)
-- `master/resume.yaml` (English) and `master/resume.fr.yaml` (French) — your master resumes. To change your resume for **all future** applications (new job, new project), ask Claude to update the master.
-- File names: English → `<Your_Name>_Resume` + `<Your_Name>_Cover_Letter`; French → `<Your_Name>_CV` + `<Your_Name>_Lettre_de_presentation` (each as .pdf and .docx)
-- `master/experience_bank.md` — skills/experience you confirmed that don't fit on one page (Claude fills it as you answer its questions)
-- `master/answer_bank.md` — your answers to application form questions (address, citizenship, graduation date, availability…). Every new question you answer is saved here, so Claude never asks it twice. You can edit it anytime.
-
-## Good to know
-
-- **Cover letters show your interest, not just your experience.** Each one explains why you want this company and this job, where you are now (your program, year and experience), and why you are a great fit, in 3 short paragraphs (~150-250 words) that sound like you. Your resume already lists the details. If Claude doesn't know a personal reason you want the job, it will ask you for one.
-- The resume style is locked to your reference resume / CV (`master/<Your_Name>_Resume.pdf` and `master/<Your_Name>_CV.pdf`); the content always has to fit on **one page**.
-- PDFs are made with Microsoft Word. If a build fails, close the `.docx` in Word and try again.
-- The Raleway font is installed for your Windows user (files in `assets/fonts/`). On a new computer, right-click each `.ttf` → **Install**.
-- Everything is saved in a local git history. Your personal files are git-ignored; keep it that way if the repo is public.
-- Manual build: `node tools/build.mjs applications/<Company>/<folder>` · dashboard: `node tools/tracker.mjs`
+Fonts: Raleway, licensed under the [SIL Open Font License](assets/fonts/OFL.txt).
